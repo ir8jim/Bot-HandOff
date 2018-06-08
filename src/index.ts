@@ -6,6 +6,7 @@ import * as bodyParser from 'body-parser';
 import * as cors from 'cors';
 let appInsights = require('applicationinsights');
 let handoff;
+let customerEndHandoffCommand;
 let setup = (bot, app, isAgent, options) => {
 
     let mongooseProvider = null;
@@ -15,6 +16,7 @@ let setup = (bot, app, isAgent, options) => {
     let _textAnalyticsKey = null;
     let _appInsightsInstrumentationKey = null;
     let _customerStartHandoffCommand = null;
+    let _customerEndHandoffCommand = null;
 
     handoff = new Handoff(bot, isAgent);
 
@@ -64,6 +66,16 @@ let setup = (bot, app, isAgent, options) => {
         _customerStartHandoffCommand = options.customerStartHandoffCommand || process.env.CUSTOMER_START_HANDOFF_COMMAND;
         exports._customerStartHandoffCommand = _customerStartHandoffCommand;
     }
+
+    if (!options.customerEndHandoffCommand && !process.env.CUSTOMER_END_HANDOFF_COMMAND) {
+        console.warn('Bot-Handoff: The customer command to end the handoff was not provided in setup options (customerEndHandoffCommand) or in the environment variables (CUSTOMER_START_HANDOFF_COMMAND). The default command will be set to help. Regex is used on this command to make sure the activation of the handoff only works if the user types the exact phrase provided in this property.');
+        _customerEndHandoffCommand = "quit";
+        exports._customerEndHandoffCommand = _customerEndHandoffCommand;
+    } else {
+        _customerEndHandoffCommand = options.customerEndHandoffCommand || process.env.CUSTOMER_END_HANDOFF_COMMAND;
+        exports._customerEndHandoffCommand = _customerEndHandoffCommand;
+    }
+    customerEndHandoffCommand = _customerEndHandoffCommand;  // hack to access this within this file
 
     if (bot) {
         bot.use(
@@ -122,7 +134,7 @@ async function triggerHandoff(session) {
     if (conversation.state == ConversationState.Bot) {
         await handoff.addToTranscript({ customerConversationId: conversation.customer.conversation.id }, message);
         await handoff.queueCustomerForAgent({ customerConversationId: conversation.customer.conversation.id });
-        session.endConversation("Connecting you to the next available agent.");
+        session.endConversation(`Connecting you to the next available agent. Type "` + customerEndHandoffCommand + `" to disconnect`);
         return;
     }
 }

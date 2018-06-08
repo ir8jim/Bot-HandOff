@@ -43,7 +43,8 @@ handoff.setup(bot, app, isAgent, {
     textAnalyticsKey: process.env.CG_SENTIMENT_KEY,
     appInsightsInstrumentationKey: process.env.APPINSIGHTS_INSTRUMENTATIONKEY,
     retainData: process.env.RETAIN_DATA,
-    customerStartHandoffCommand: process.env.CUSTOMER_START_HANDOFF_COMMAND
+    customerStartHandoffCommand: process.env.CUSTOMER_START_HANDOFF_COMMAND,
+    customerEndHandoffCommand: process.env.CUSTOMER_END_HANDOFF_COMMAND
 });
 
 ```

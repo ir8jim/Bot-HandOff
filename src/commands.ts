@@ -1,5 +1,6 @@
 import * as builder from 'botbuilder';
 import { Conversation, ConversationState, Handoff } from './handoff';
+import { ELOOP } from 'constants';
 const indexExports = require('./index');
 
 export function commandsMiddleware(bot: builder.UniversalBot, handoff: Handoff) {
@@ -19,7 +20,7 @@ function command(session: builder.Session, next: Function, handoff: Handoff, bot
     if (handoff.isAgent(session)) {
         agentCommand(session, next, handoff, bot);
     } else {
-        customerCommand(session, next, handoff);
+        customerCommand(session, next, handoff, bot);
     }
 }
 
@@ -44,6 +45,9 @@ async function agentCommand(
             return;
         case 'list':
             session.send(await currentConversations(handoff));
+            return;
+        case 'listw':
+            session.send(await currentConversations(handoff, true));
             return;
         case 'history':
             await handoff.getCustomerTranscript(
@@ -94,16 +98,26 @@ async function agentCommand(
     }
 }
 
-async function customerCommand(session: builder.Session, next: Function, handoff: Handoff) {
+async function customerCommand(session: builder.Session, next: Function, handoff: Handoff, bot: builder.UniversalBot) {
+
     const message = session.message;
     const customerStartHandoffCommandRegex = new RegExp("^" + indexExports._customerStartHandoffCommand + "$", "gi");
+    const customerEndHandoffCommandRegex =  new RegExp("^" + indexExports._customerEndHandoffCommand + "$", "gi");
+
+    // lookup the conversation (create it if one doesn't already exist)
+    const conversation = await handoff.getConversation({ customerConversationId: message.address.conversation.id }, message.address);
+
     if (customerStartHandoffCommandRegex.test(message.text)) {
-        // lookup the conversation (create it if one doesn't already exist)
-        const conversation = await handoff.getConversation({ customerConversationId: message.address.conversation.id }, message.address);
         if (conversation.state == ConversationState.Bot) {
             await handoff.addToTranscript({ customerConversationId: conversation.customer.conversation.id }, message);
             await handoff.queueCustomerForAgent({ customerConversationId: conversation.customer.conversation.id });
-            session.endConversation("Connecting you to the next available agent.");
+            session.endConversation(`Connecting you to the next available agent. Type "` + indexExports._customerEndHandoffCommand + `" to disconnect`);
+            return;
+        }
+    }
+    else if (customerEndHandoffCommandRegex.test(message.text)) {
+        if (conversation.state != ConversationState.Bot) {
+            disconnectAgent(conversation, handoff, session, bot)
             return;
         }
     }
@@ -111,27 +125,27 @@ async function customerCommand(session: builder.Session, next: Function, handoff
 }
 
 function sendAgentCommandOptions(session: builder.Session) {
-    const commands = ' ### Agent Options\n - Type *waiting* to connect to customer who has been waiting longest.\n - Type *connect { user id }* to connect to a specific conversation\n - Type *history { user id }* to see a transcript of a given user\n - Type *list* to see a list of all current conversations.\n - Type *disconnect* while talking to a user to end a conversation.\n - Type *options* at any time to see these options again.';
+    const commands = ' ### Agent Options\n - Type *waiting* to connect to customer who has been waiting longest.\n - Type *connect { user id }* to connect to a specific conversation\n - Type *history { user id }* to see a transcript of a given user\n - Type *list* to see a list of all current conversations.\n - Type *listw* to see a list of all waiting conversations.\n - Type *disconnect* while talking to a user to end a conversation.\n - Type *options* at any time to see these options again.';
     session.send(commands);
     return;
 }
 
-async function currentConversations(handoff: Handoff): Promise<string> {
+async function currentConversations(handoff: Handoff, onlyWaiting: boolean = false): Promise<string> {
     const conversations = await handoff.getCurrentConversations();
     if (conversations.length === 0) {
         return "No customers are in conversation.";
     }
 
-    let text = '### Current Conversations \n';
+    let text = (onlyWaiting) ? '### Waiting Conversations\n' : '### Current Conversations \n';
     text += "Please use the user's ID to connect with them.\n\n";
     conversations.forEach(conversation => {
-        const starterText = ` - *${conversation.customer.user.name} (ID: ${conversation.customer.user.id})*`;
+        const starterText = ` - *${conversation.customer.user.name} (ID: ${conversation.customer.user.id})*`;    
         switch (ConversationState[conversation.state]) {
             case 'Bot':
-                text += starterText + ' is talking to the bot\n';
+                if (!onlyWaiting) text += starterText + ' is talking to the bot\n';
                 break;
             case 'Agent':
-                text += starterText + ' is talking to an agent\n';
+                if (!onlyWaiting) text += starterText + ' is talking to an agent\n';
                 break;
             case 'Waiting':
                 text += starterText + ' is waiting to talk to an agent\n';
@@ -153,6 +167,23 @@ async function disconnectCustomer(conversation: Conversation, handoff: any, sess
                 .address(conversation.customer)
                 .text('Agent has disconnected, you are now speaking to the bot.');
             bot.send(reply);
+        }
+    }
+}
+
+async function disconnectAgent(conversation: Conversation, handoff: any, session: builder.Session, bot?: builder.UniversalBot) {
+    if (await handoff.connectCustomerToBot({ customerConversationId: conversation.customer.conversation.id })) {
+        //Send message to customer
+        session.send(`You are now disconnected from the Agent.`);
+
+        if (bot) {
+            //Send message to agent if connected
+            if (conversation.agent) {
+                var reply = new builder.Message()
+                    .address(conversation.agent)
+                    .text(`Customer ${conversation.customer.user.name} (${conversation.customer.user.id}) has disconnected from you`);
+                bot.send(reply);
+            }
         }
     }
 }
