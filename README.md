@@ -44,7 +44,8 @@ handoff.setup(bot, app, isAgent, {
     appInsightsInstrumentationKey: process.env.APPINSIGHTS_INSTRUMENTATIONKEY,
     retainData: process.env.RETAIN_DATA,
     customerStartHandoffCommand: process.env.CUSTOMER_START_HANDOFF_COMMAND,
-    customerEndHandoffCommand: process.env.CUSTOMER_END_HANDOFF_COMMAND
+    customerEndHandoffCommand: process.env.CUSTOMER_END_HANDOFF_COMMAND,
+    captureConversations: process.env.CAPTURE_CONVERSATIONS
 });
 
 ```
@@ -111,6 +112,16 @@ retainData is optional. If you want to keep the data after a hand off, you must 
 `{customerStartHandoffCommand: process.env.CUSTOMER_START_HANDOFF_COMMAND}`
 
 customerStartHandoffCommand is optional. This is the command that a user (customer, not agent) can type to start the handoff which will queue them to speak to an agent. The default command will be set to `"help"`. Regex is used on this command to make sure the activation of the handoff only works if the user types the exact phrase provided in this property.
+
+#### customerEndHandoffCommand
+`{customerEndHandoffCommand: process.env.CUSTOMER_END_HANDOFF_COMMAND}`
+
+customerEndHandoffCommand is optional. This is the command that a user (customer, not agent) can type to stop waiting for or interacting with and agent. The default command will be set to `"quit"`. Regex is used on this command to make sure the activation of the handoff only works if the user types the exact phrase provided in this property.
+
+#### captureConversatons
+`{captureConversations: process.env.CAPTURE_CONVERSATIONS}`
+
+captureConversatons is optional. This command can be used to stop all recording of customer conversations by setting this to `"false"`. The default command will be set to `"true"`.
 
 #### Required environment variables:
 ```

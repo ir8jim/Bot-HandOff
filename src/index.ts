@@ -17,6 +17,7 @@ let setup = (bot, app, isAgent, options) => {
     let _appInsightsInstrumentationKey = null;
     let _customerStartHandoffCommand = null;
     let _customerEndHandoffCommand = null;
+    let _captureConversations = null;
 
     handoff = new Handoff(bot, isAgent);
 
@@ -68,7 +69,7 @@ let setup = (bot, app, isAgent, options) => {
     }
 
     if (!options.customerEndHandoffCommand && !process.env.CUSTOMER_END_HANDOFF_COMMAND) {
-        console.warn('Bot-Handoff: The customer command to end the handoff was not provided in setup options (customerEndHandoffCommand) or in the environment variables (CUSTOMER_START_HANDOFF_COMMAND). The default command will be set to help. Regex is used on this command to make sure the activation of the handoff only works if the user types the exact phrase provided in this property.');
+        console.warn('Bot-Handoff: The customer command to end the handoff was not provided in setup options (customerEndHandoffCommand) or in the environment variables (CUSTOMER_END_HANDOFF_COMMAND). The default command will be set to help. Regex is used on this command to make sure the activation of the handoff only works if the user types the exact phrase provided in this property.');
         _customerEndHandoffCommand = "quit";
         exports._customerEndHandoffCommand = _customerEndHandoffCommand;
     } else {
@@ -76,6 +77,15 @@ let setup = (bot, app, isAgent, options) => {
         exports._customerEndHandoffCommand = _customerEndHandoffCommand;
     }
     customerEndHandoffCommand = _customerEndHandoffCommand;  // hack to access this within this file
+
+    if (!options.captureConversations && !process.env.CAPTURE_CONVERSATIONS) {
+        console.warn('Bot-Handoff: Conversation capture setting was not provided in setup options (captureConversations) or in the environment variables (CAPTURE_CONVERSATIONS). The default command will be set to help. Regex is used on this command to make sure the activation of the handoff only works if the user types the exact phrase provided in this property.');
+        _captureConversations = "true";
+        exports._captureConversatons = _captureConversations;
+    } else {
+        _captureConversations = options.captureConversations || process.env.CAPTURE_CONVERSATIONS;
+        exports._captureConversations = _captureConversations;
+    }
 
     if (bot) {
         bot.use(
